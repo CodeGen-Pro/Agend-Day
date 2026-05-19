@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mi Agenda">
+<script>
+// PWA Manifest inyectado inline para funcionar desde archivo local
+(function(){
+  const icon = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" rx="40" fill="%230f0e17"/><text x="96" y="130" font-size="100" text-anchor="middle">◈</text></svg>')}`;
+  const manifest = {
+    name: "Mi Agenda",
+    short_name: "Agenda",
+    description: "Mi agenda semanal personal",
+    start_url: window.location.href,
+    display: "standalone",
+    background_color: "#0f0e17",
+    theme_color: "#0f0e17",
+    orientation: "portrait",
+    icons: [
+      { src: icon, sizes: "192x192", type: "image/svg+xml" },
+      { src: icon, sizes: "512x512", type: "image/svg+xml" }
+    ]
+  };
+  const blob = new Blob([JSON.stringify(manifest)], {type: 'application/manifest+json'});
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('link');
+  link.rel = 'manifest';
+  link.href = url;
+  document.currentScript.parentNode.appendChild(link);
+})();
+</script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0f0e17;
+  --bg2:#1a1826;
+  --bg3:#231f35;
+  --border:#2e2a45;
+  --accent:#7c6af7;
+  --accent2:#5edbc0;
+  --accent3:#f7a26a;
+  --accent4:#f76a8a;
+  --accent5:#a8f76a;
+  --text:#ede9fe;
+  --text2:#9b93c4;
+  --text3:#5e577a;
+  --card:#1e1b2e;
+  --radius:14px;
+  --font:'Outfit',sans-serif;
+  --mono:'DM Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overscroll-behavior:none}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;max-width:680px;margin:0 auto;overflow-x:hidden}
+
+/* ── HEADER ── */
+.hdr{background:linear-gradient(180deg,var(--bg2) 0%,rgba(26,24,38,0) 100%);padding:16px 18px 12px;position:sticky;top:0;z-index:100;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.hdr-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.hdr h1{font-size:20px;font-weight:800;letter-spacing:-.5px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hdr-sub{font-size:12px;color:var(--text3);font-family:var(--mono)}
+.notif-btn{background:var(--bg3);border:1px solid var(--border);color:var(--text2);padding:6px 12px;border-radius:20px;font-size:12px;cursor:pointer;font-family:var(--font);transition:all .2s;white-space:nowrap}
+.notif-btn:hover{border-color:var(--accent);color:var(--accent)}
+.notif-btn.on{background:rgba(94,219,192,.12);border-color:var(--accent2);color:var(--accent2)}
+
+/* ── DAY TABS ── */
+.day-tabs{display:flex;overflow-x:auto;scrollbar-width:none;padding:0 18px;gap:6px;margin-bottom:4px}
+.day-tabs::-webkit-scrollbar{display:none}
+.dtab{flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding:8px 10px;border-radius:12px;border:1px solid transparent;background:none;cursor:pointer;min-width:56px;transition:all .2s;position:relative}
+.dtab .dn{font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px;font-family:var(--font)}
+.dtab .dd{font-size:16px;font-weight:700;color:var(--text2);width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:50%;transition:all .2s}
+.dtab.active{background:rgba(124,106,247,.12);border-color:rgba(124,106,247,.3)}
+.dtab.active .dn{color:var(--accent)}
+.dtab.active .dd{background:var(--accent);color:#fff}
+.dtab.today .dd{box-shadow:0 0 0 2px var(--accent2)}
+.dtab.today .dn{color:var(--accent2)}
+.tdot{width:4px;height:4px;border-radius:50%;background:var(--accent);position:absolute;bottom:4px;opacity:0;transition:opacity .2s}
+.dtab.has .tdot{opacity:1}
+
+/* ── MAIN NAV ── */
+.main-nav{display:flex;padding:0 18px;gap:4px;margin:8px 0 0}
+.mnav{flex:1;padding:10px 6px;border:none;background:none;color:var(--text3);font-size:12px;font-weight:600;cursor:pointer;border-radius:10px;font-family:var(--font);transition:all .2s;text-align:center;letter-spacing:.3px}
+.mnav.active{background:rgba(124,106,247,.15);color:var(--accent)}
+.mnav:hover{color:var(--text)}
+
+/* ── PAGES ── */
+.pg{display:none;padding:14px 18px 90px}
+.pg.show{display:block}
+
+/* ── CARDS ── */
+.card{background:var(--card);border-radius:var(--radius);border:1px solid var(--border);margin-bottom:8px;overflow:hidden;transition:border-color .2s}
+.card:hover{border-color:rgba(124,106,247,.3)}
+.card.now{border-color:var(--accent);box-shadow:0 0 0 1px rgba(124,106,247,.2),0 4px 20px rgba(124,106,247,.15)}
+.card.done{opacity:.4}
+.card.done .cname{text-decoration:line-through}
+.card.clase-card{border-left:3px solid var(--accent3)}
+.accent-bar{height:3px}
+.card-head{display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer}
+.cico{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.cinfo{flex:1;min-width:0}
+.cname{font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cmeta{font-size:11px;color:var(--text3);margin-top:2px;font-family:var(--mono)}
+.cright{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0}
+.pill{font-size:10px;padding:3px 8px;border-radius:20px;font-weight:600;letter-spacing:.3px}
+.pill-now{background:rgba(124,106,247,.2);color:var(--accent);border:1px solid rgba(124,106,247,.4)}
+.pill-done{background:rgba(94,219,192,.15);color:var(--accent2)}
+.pill-notif{font-size:10px;color:var(--text3)}
+.card-body{padding:0 14px 12px;border-top:1px solid var(--border)}
+.card-body.hidden{display:none}
+.steps{list-style:none;margin-top:10px;display:flex;flex-direction:column;gap:7px}
+.steps li{display:flex;gap:10px;align-items:flex-start}
+.snum{width:22px;height:22px;border-radius:50%;background:rgba(124,106,247,.15);border:1px solid rgba(124,106,247,.25);color:var(--accent);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;font-family:var(--mono)}
+.stxt{font-size:13px;color:var(--text2);line-height:1.5}
+.stxt b{color:var(--accent2)}
+.cacts{display:flex;gap:4px;margin-top:10px;flex-wrap:wrap}
+.ca{background:none;border:1px solid var(--border);color:var(--text3);font-size:12px;cursor:pointer;padding:5px 10px;border-radius:8px;transition:all .15s;font-family:var(--font)}
+.ca:hover{border-color:var(--accent);color:var(--accent)}
+.ca.red:hover{border-color:var(--accent4);color:var(--accent4)}
+
+/* ── TIMELINE ── */
+.tl-row{display:flex;gap:10px}
+.tl-time{width:44px;flex-shrink:0;font-size:11px;color:var(--text3);font-weight:500;text-align:right;padding-top:16px;font-family:var(--mono)}
+.tl-mid{display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:16px}
+.tl-dot{width:10px;height:10px;border-radius:50%;margin-top:18px;flex-shrink:0;z-index:1}
+.tl-line{width:2px;flex:1;min-height:12px;margin-bottom:0;opacity:.3}
+.tl-right{flex:1;padding-bottom:8px}
+
+/* ── STATS ── */
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.stat{background:var(--card);border-radius:12px;padding:12px;border:1px solid var(--border);text-align:center}
+.stat-n{font-size:22px;font-weight:800;color:var(--accent);font-family:var(--mono)}
+.stat-l{font-size:11px;color:var(--text3);margin-top:2px}
+.prog-box{background:var(--card);border-radius:12px;padding:12px 14px;border:1px solid var(--border);margin-bottom:12px}
+.prog-row{display:flex;justify-content:space-between;font-size:13px;color:var(--text2);margin-bottom:7px}
+.prog-row span:last-child{font-weight:700;color:var(--accent);font-family:var(--mono)}
+.pbar{height:6px;background:var(--bg3);border-radius:10px;overflow:hidden}
+.pfill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:10px;transition:width .5s ease}
+.day-head-card{display:flex;align-items:center;justify-content:space-between;background:var(--card);border-radius:var(--radius);padding:13px 15px;border:1px solid var(--border);margin-bottom:12px}
+.dhc-left h2{font-size:17px;font-weight:800;color:var(--text);margin-bottom:2px}
+.dhc-left p{font-size:11px;color:var(--text3)}
+.chip{font-size:11px;padding:4px 10px;border-radius:20px;font-weight:600}
+.chip-ent{background:rgba(167,247,106,.1);color:var(--accent5);border:1px solid rgba(167,247,106,.2)}
+.chip-ing{background:rgba(94,219,192,.1);color:var(--accent2);border:1px solid rgba(94,219,192,.2)}
+.chip-lib{background:rgba(247,162,106,.1);color:var(--accent3);border:1px solid rgba(247,162,106,.2)}
+.chip-pla{background:rgba(124,106,247,.1);color:var(--accent);border:1px solid rgba(124,106,247,.2)}
+.add-btn{background:var(--accent);color:#fff;border:none;padding:8px 14px;border-radius:20px;font-size:12px;cursor:pointer;font-family:var(--font);font-weight:600;transition:all .2s}
+.add-btn:hover{background:#6a59e8;transform:translateY(-1px)}
+.alert{background:rgba(124,106,247,.08);border:1px solid rgba(124,106,247,.2);border-radius:10px;padding:10px 13px;margin-bottom:12px;font-size:13px;color:var(--text2)}
+
+/* ── FOOD ── */
+.kcal-hero{background:linear-gradient(135deg,var(--bg3),rgba(124,106,247,.2));border:1px solid rgba(124,106,247,.25);border-radius:16px;padding:18px;margin-bottom:12px}
+.kh-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}
+.kh-consumed{font-size:38px;font-weight:800;color:var(--text);line-height:1;font-family:var(--mono)}
+.kh-consumed span{font-size:14px;font-weight:400;color:var(--text3)}
+.kh-label{font-size:12px;color:var(--text3);margin-top:3px}
+.kh-remaining{background:rgba(94,219,192,.12);border:1px solid rgba(94,219,192,.2);border-radius:10px;padding:8px 12px;text-align:right}
+.kh-rem-n{font-size:18px;font-weight:700;color:var(--accent2);font-family:var(--mono)}
+.kh-rem-l{font-size:10px;color:var(--text3);margin-top:1px}
+.macros{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.macro{background:rgba(255,255,255,.04);border-radius:10px;padding:9px 10px;text-align:center}
+.macro-val{font-size:17px;font-weight:700;font-family:var(--mono)}
+.macro-lbl{font-size:10px;color:var(--text3);margin-top:2px}
+.macro-goal{font-size:10px;margin-top:1px}
+.mbar{height:3px;background:rgba(255,255,255,.08);border-radius:4px;margin-top:6px;overflow:hidden}
+.mbar-fill{height:100%;border-radius:4px;transition:width .3s}
+.water-box{background:var(--card);border-radius:12px;padding:13px;border:1px solid var(--border);margin-bottom:12px}
+.water-hd{display:flex;justify-content:space-between;font-size:13px;margin-bottom:10px}
+.water-hd span:first-child{color:var(--text2);font-weight:500}
+.water-hd span:last-child{color:var(--accent);font-weight:700;font-family:var(--mono)}
+.wglasses{display:flex;gap:8px;flex-wrap:wrap}
+.wg{font-size:24px;cursor:pointer;opacity:.2;filter:grayscale(1);transition:all .2s;user-select:none}
+.wg.fill{opacity:1;filter:none}
+.wg:hover{transform:scale(1.15)}
+.meal-section-title{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin:14px 0 7px;font-family:var(--mono)}
+.food-item{background:var(--card);border-radius:11px;padding:11px 13px;border:1px solid var(--border);margin-bottom:7px;display:flex;align-items:center;gap:11px}
+.food-ico{font-size:22px;width:36px;text-align:center;flex-shrink:0}
+.food-info{flex:1;min-width:0}
+.food-name{font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.food-macros{font-size:11px;color:var(--text3);margin-top:2px;font-family:var(--mono)}
+.food-kcal{font-size:15px;font-weight:700;color:var(--accent);font-family:var(--mono);flex-shrink:0}
+.fdel{background:none;border:none;color:var(--border);cursor:pointer;font-size:16px;padding:2px 6px;transition:color .2s}
+.fdel:hover{color:var(--accent4)}
+.add-food-btn{width:100%;background:var(--bg3);border:1.5px dashed var(--border);color:var(--text2);padding:13px;border-radius:12px;font-size:14px;cursor:pointer;font-family:var(--font);font-weight:500;transition:all .2s;margin-top:4px}
+.add-food-btn:hover{border-color:var(--accent);color:var(--accent);background:rgba(124,106,247,.06)}
+.empty-state{text-align:center;padding:40px 20px}
+.empty-state .emo{font-size:40px;margin-bottom:12px}
+.empty-state p{color:var(--text3);font-size:14px}
+
+/* ── HIGIENE ── */
+.hyg-section{margin-bottom:14px}
+.hyg-title{font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;font-family:var(--mono);display:flex;align-items:center;gap:6px}
+.hyg-title::after{content:'';flex:1;height:1px;background:var(--border)}
+.hyg-card{background:var(--card);border-radius:12px;border:1px solid var(--border);overflow:hidden;margin-bottom:8px}
+.hyg-accent{height:3px}
+.hyg-body{padding:13px}
+.tip-row{display:flex;gap:10px;align-items:flex-start;margin-bottom:8px}
+.tip-row:last-child{margin-bottom:0}
+.tip-ico{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:1px}
+.tip-txt{font-size:13px;color:var(--text2);line-height:1.5}
+.tip-txt b{color:var(--text);font-weight:600}
+.tip-label{font-size:10px;color:var(--text3);margin-top:2px;font-family:var(--mono)}
+
+/* ── MODAL ── */
+.mov{display:none;position:fixed;inset:0;background:rgba(15,14,23,.8);z-index:500;align-items:flex-end;justify-content:center;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.mov.show{display:flex}
+.modal{background:var(--bg2);border-radius:22px 22px 0 0;padding:20px 18px 36px;width:100%;max-width:680px;animation:sup .28s cubic-bezier(.16,1,.3,1);max-height:92vh;overflow-y:auto;border-top:1px solid var(--border)}
+@keyframes sup{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.mhandle{width:36px;height:4px;background:var(--border);border-radius:10px;margin:0 auto 20px}
+.modal h3{font-size:16px;font-weight:700;margin-bottom:16px;color:var(--text)}
+.fg{margin-bottom:12px}
+.fg label{display:block;font-size:10px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:.6px;font-family:var(--mono)}
+.fg input,.fg select,.fg textarea{width:100%;padding:11px 13px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;font-size:15px;font-family:var(--font);outline:none;color:var(--text);transition:border .2s;-webkit-appearance:none}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--accent)}
+.fg textarea{resize:vertical;min-height:80px;line-height:1.5}
+.fg select option{background:var(--bg2)}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.frow3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.mbtns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}
+.bpri{background:var(--accent);color:#fff;border:none;padding:13px;border-radius:12px;font-size:15px;cursor:pointer;font-family:var(--font);font-weight:600;transition:all .2s}
+.bpri:hover{background:#6a59e8}
+.bsec{background:var(--bg3);color:var(--text2);border:1px solid var(--border);padding:13px;border-radius:12px;font-size:15px;cursor:pointer;font-family:var(--font);font-weight:500}
+.fsug-wrap{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.fsug{background:var(--bg3);color:var(--text2);border:1px solid var(--border);padding:5px 10px;border-radius:8px;font-size:12px;cursor:pointer;font-family:var(--font);transition:all .15s;white-space:nowrap}
+.fsug:hover{border-color:var(--accent);color:var(--accent);background:rgba(124,106,247,.08)}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-row">
+    <h1>◈ Mi Agenda</h1>
+    <button class="notif-btn" id="notif-btn" onclick="reqNotif()">🔔 Activar avisos</button>
+  </div>
+  <div class="hdr-sub" id="clock-sub">cargando...</div>
+</div>
+
+<div class="day-tabs" id="day-tabs"></div>
+
+<div class="main-nav">
+  <button class="mnav active" onclick="switchMain('agenda',this)">📋 Agenda</button>
+  <button class="mnav" onclick="switchMain('food',this)">🥗 Comida</button>
+  <button class="mnav" onclick="switchMain('higiene',this)">🪥 Higiene</button>
+</div>
+
+<div class="pg show" id="pg-agenda"></div>
+<div class="pg" id="pg-food"></div>
+<div class="pg" id="pg-higiene"></div>
+
+<!-- MODAL TAREA -->
+<div class="mov" id="m-task" onclick="closeMov('m-task',event)">
+  <div class="modal">
+    <div class="mhandle"></div>
+    <h3 id="mt-title">Nuevo bloque</h3>
+    <div class="fg"><label>Nombre</label><input id="f-name" placeholder="Ej: Estudiar redes, Cardio..."></div>
+    <div class="frow">
+      <div class="fg"><label>Inicio</label><input type="time" id="f-start" value="15:00"></div>
+      <div class="fg"><label>Fin</label><input type="time" id="f-end" value="16:00"></div>
+    </div>
+    <div class="fg"><label>Día</label><select id="f-day"></select></div>
+    <div class="fg"><label>Pasos (uno por línea)</label><textarea id="f-notes" placeholder="Escribe los pasos o instrucciones, uno por línea..."></textarea></div>
+    <div class="fg"><label>Emoji</label><input id="f-emoji" placeholder="💻 🏋️ 📚..." maxlength="4"></div>
+    <div class="mbtns">
+      <button class="bsec" onclick="document.getElementById('m-task').classList.remove('show')">Cancelar</button>
+      <button class="bpri" onclick="saveTask()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL COMIDA -->
+<div class="mov" id="m-food" onclick="closeMov('m-food',event)">
+  <div class="modal">
+    <div class="mhandle"></div>
+    <h3>Añadir alimento</h3>
+    <div class="fg">
+      <label>Nombre</label>
+      <input id="ff-name" placeholder="Ej: Pollo plancha, Avena...">
+      <div class="fsug-wrap">
+        <button class="fsug" onclick="qf('Pollo plancha','🍗',165,31,0,4)">🍗 Pollo</button>
+        <button class="fsug" onclick="qf('Arroz cocido','🍚',130,3,28,0)">🍚 Arroz</button>
+        <button class="fsug" onclick="qf('Huevos ×2','🥚',148,12,1,10)">🥚 Huevos</button>
+        <button class="fsug" onclick="qf('Avena 60g','🥣',220,8,38,4)">🥣 Avena</button>
+        <button class="fsug" onclick="qf('Atún lata','🐟',120,26,0,1)">🐟 Atún</button>
+        <button class="fsug" onclick="qf('Plátano','🍌',89,1,23,0)">🍌 Plátano</button>
+        <button class="fsug" onclick="qf('Pasta cocida','🍝',160,6,31,1)">🍝 Pasta</button>
+        <button class="fsug" onclick="qf('Leche 250ml','🥛',120,8,12,5)">🥛 Leche</button>
+        <button class="fsug" onclick="qf('Almendras 30g','🌰',174,6,6,15)">🌰 Almendras</button>
+        <button class="fsug" onclick="qf('Yogur griego','🫙',100,15,5,1)">🫙 Yogur</button>
+        <button class="fsug" onclick="qf('Whey protein','🥤',120,24,3,2)">🥤 Proteína</button>
+        <button class="fsug" onclick="qf('Salmón 150g','🐟',233,25,0,14)">🐟 Salmón</button>
+        <button class="fsug" onclick="qf('Pan integral','🍞',130,5,24,2)">🍞 Pan integral</button>
+        <button class="fsug" onclick="qf('Boniato 200g','🍠',172,3,40,0)">🍠 Boniato</button>
+        <button class="fsug" onclick="qf('Mantequilla cacahuete','🥜',188,8,6,16)">🥜 ManteCacah.</button>
+      </div>
+    </div>
+    <div class="fg"><label>Emoji</label><input id="ff-emoji" placeholder="🍗" maxlength="4"></div>
+    <div class="frow">
+      <div class="fg"><label>Momento</label>
+        <select id="ff-meal">
+          <option>Desayuno</option>
+          <option>Media mañana</option>
+          <option>Comida</option>
+          <option>Post-entreno</option>
+          <option>Merienda</option>
+          <option>Cena</option>
+        </select>
+      </div>
+      <div class="fg"><label>Calorías</label><input type="number" id="ff-kcal" placeholder="kcal"></div>
+    </div>
+    <div class="frow3">
+      <div class="fg"><label>Proteína g</label><input type="number" id="ff-prot" placeholder="0"></div>
+      <div class="fg"><label>Carbos g</label><input type="number" id="ff-carb" placeholder="0"></div>
+      <div class="fg"><label>Grasa g</label><input type="number" id="ff-fat" placeholder="0"></div>
+    </div>
+    <div class="mbtns">
+      <button class="bsec" onclick="document.getElementById('m-food').classList.remove('show')">Cancelar</button>
+      <button class="bpri" onclick="saveFood()">Añadir</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════
+const DN=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+const DS=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+const KCAL_GOAL=2500, PROT_GOAL=150, CARB_GOAL=280, FAT_GOAL=70;
+// 2500 kcal para ganar músculo a 65kg activo
+let curDay=0, editId=null, notifOn=false, timers={}, curMain='agenda';
+
+// ═══════════════════════════════════════
+// STORAGE
+// ═══════════════════════════════════════
+const S={
+  get(k){try{return JSON.parse(localStorage.getItem(k));}catch{return null;}},
+  set(k,v){localStorage.setItem(k,JSON.stringify(v));},
+  tasks(){return this.get('v4_tasks')||{};},
+  setTasks(d){this.set('v4_tasks',d);},
+  food(){return this.get('v4_food')||{};},
+  setFood(d){this.set('v4_food',d);},
+  water(){return this.get('v4_water')||{};},
+  setWater(d){this.set('v4_water',d);}
+};
+
+// ═══════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════
+const t2m=t=>{const[h,m]=t.split(':').map(Number);return h*60+m;};
+const nowMin=()=>{const n=new Date();return n.getHours()*60+n.getMinutes();};
+const realDay=()=>{const d=new Date().getDay();return d===0?6:d-1;};
+const todayStr=()=>new Date().toISOString().slice(0,10);
+const durFmt=m=>m>=60?`${Math.floor(m/60)}h${m%60?String(m%60).padStart(2,'0'):''}`:m+'min';
+
+// ═══════════════════════════════════════
+// WEEK PLAN — COMPLETO CON PASOS DETALLADOS
+// ═══════════════════════════════════════
+const PLAN={
+0:[ // LUNES — Entreno tren superior
+  {id:'l0',name:'Despertarse',emoji:'⏰',start:'07:00',end:'07:05',color:'#f7a26a',notes:'Apaga la alarma al primer toque. No snooze.\nRespira hondo 3 veces antes de levantarte.\nMueve pies y manos en la cama primero.'},
+  {id:'l1',name:'Higiene de mañana',emoji:'🪥',start:'07:05',end:'07:30',color:'#5edbc0',notes:'Ir al baño.\nLavarse la cara con agua fría (activa el cerebro).\nCepillarse los dientes 2 minutos completos.\nLimpiar lengua con cepillo o raspador.\nDesodorante.\nPeinarse.\nVestirse con ropa de calle limpia.'},
+  {id:'l2',name:'Desayuno',emoji:'🥣',start:'07:30',end:'07:50',color:'#a8f76a',notes:'🎯 Objetivo: ~600 kcal · 30g proteína\n\nOpción A: Avena 60g + leche + 2 huevos revueltos + plátano\nOpción B: Tostadas integrales + 3 huevos + zumo\n\nCome sentado sin móvil.\nMastica despacio — mejora la digestión.\nBebe 1 vaso de agua antes de comer.'},
+  {id:'l3',name:'Preparar mochila y salir',emoji:'🎒',start:'07:50',end:'08:00',color:'#f7a26a',notes:'Revisar mochila: cuadernos, bolígrafo, cargador.\nCoger botella de agua (500ml mínimo).\nSalir con 5 min de margen para no ir corriendo.'},
+  {id:'l4',name:'🏫 Clase',emoji:'🏫',start:'08:00',end:'14:00',color:'#f7a26a',notes:'Siéntate en las primeras filas si puedes.\nApunta TODO aunque no entiendas — ya lo procesarás.\nEn los descansos: levántate, camina, estira el cuello.\nBebe agua regularmente.\nSilencia el móvil completamente.',clase:true},
+  {id:'l5',name:'Comida fuera',emoji:'🍽️',start:'14:00',end:'15:00',color:'#a8f76a',notes:'🎯 Objetivo: ~650 kcal · 45g proteína\n\nBusca: proteína (carne/pescado) + carbos (arroz/pasta) + verdura\nEvita: fritos, pizzas, menú basura, refrescos\nPide agua siempre.\nCome despacio — tardas 20 min en sentirte lleno.'},
+  {id:'l6',name:'Ciberseguridad — Concepto nuevo',emoji:'💻',start:'15:00',end:'16:00',color:'#7c6af7',notes:'1. Elige UN solo tema hoy (ejemplos: Kali Linux, escaneo de redes, criptografía básica, tipos de malware, qué es un CTF)\n2. Busca 1 vídeo en YouTube (máx 20 min) + 1 artículo\n3. Toma apuntes en papel o Notion mientras lo ves\n4. Al terminar: escribe 3 frases de lo que aprendiste\n5. Apunta 1 duda concreta para investigar mañana\n\n📚 Recursos: NetworkChuck, David Bombal, John Hammond'},
+  {id:'l7',name:'Cambio de ropa + hidratación',emoji:'👟',start:'16:00',end:'16:10',color:'#f76a8a',notes:'Ponerse ropa de entrenamiento.\nBeber 500ml de agua AHORA.\nComer 1 plátano si tienes hambre (energía para el entreno).\nMentalízate: estos 110 min son para ti.'},
+  {id:'l8',name:'🏋️ Entreno — Tren Superior',emoji:'🏋️',start:'16:10',end:'18:00',color:'#f76a8a',notes:'━━ CALENTAMIENTO 10 min ━━\n• 5 min cardio ligero (saltar a la comba, caminar rápido)\n• Rotaciones de hombros: 10 hacia adelante, 10 atrás\n• Rotaciones de muñecas: 10 c/lado\n• 10 flexiones lentas con pausa abajo\n\n━━ EJERCICIOS PRINCIPALES ━━\n• Press banca plano: 4 series × 10 reps\n• Jalón al pecho o dominadas: 4 × 8\n• Press de hombro con mancuernas: 3 × 10\n• Remo con mancuerna: 3 × 10 c/lado\n• Curl de bíceps: 3 × 12\n• Tríceps en polea o fondos: 3 × 12\n• Pájaros o elevaciones laterales: 3 × 15\n\n⏱ Descanso 60-90 seg entre series\n💧 Bebe agua entre series'},
+  {id:'l9',name:'Estiramientos post-entreno',emoji:'🧘',start:'18:00',end:'18:20',color:'#5edbc0',notes:'1. Pectoral en pared: brazo extendido en marco, gira el cuerpo → 40 seg c/lado\n2. Hombro cruzado: lleva el brazo al pecho → 30 seg c/lado\n3. Tríceps sobre cabeza: codo al cielo, mano a la espalda → 30 seg c/lado\n4. Bíceps: brazo extendido hacia atrás, palma abajo → 30 seg\n5. Cuello: lado a lado, chin-to-chest → 20 seg cada movimiento\n6. Espalda: abrázate y redondea la espalda → 30 seg\n\n🌬 Respiración lenta y profunda en cada estiramiento.'},
+  {id:'l10',name:'Ducha y merienda post-entreno',emoji:'🚿',start:'18:20',end:'18:50',color:'#5edbc0',notes:'━━ DUCHA ━━\n• Agua caliente 3-4 min (relaja músculos)\n• Lavar con gel: cuerpo entero, axilas, pies\n• Últimos 30 seg en agua fría (reduce inflamación)\n• Secar bien, desodorante\n\n━━ MERIENDA (dentro de 30 min post-entreno) ━━\n🎯 ~400 kcal · 35g proteína\n• Batido proteína + 250ml leche, o\n• Yogur griego + plátano + 1 cucharada miel, o\n• 3 huevos revueltos + tostada'},
+  {id:'l11',name:'Proyecto ciberseguridad',emoji:'🛡️',start:'18:50',end:'20:00',color:'#7c6af7',notes:'1. Abre tu lab: TryHackMe, HackTheBox, o máquina virtual\n2. Aplica el concepto que aprendiste hoy\n3. Si estás atascado: Google, foros, YouTube → máx 5 min buscando antes de intentar\n4. Documenta en GitHub: qué hiciste, qué aprendiste, qué falló\n5. Escribe aunque sea 3 líneas de write-up\n\n🎯 Objetivo semanal: 1 room completada o 1 reto documentado'},
+  {id:'l12',name:'Curiosidades y ocio educativo',emoji:'🎬',start:'20:00',end:'20:30',color:'#f76a8a',notes:'Desconecta la mente del estudio pero sigue aprendiendo:\n• YouTube tech: Fireship, Veritasium, Kurzgesagt\n• Podcast: Darknet Diaries, Security Now, Lex Fridman\n• Serie: Mr. Robot, Halt and Catch Fire, Silicon Valley\n• Documental tecnológico o científico'},
+  {id:'l13',name:'Cena',emoji:'🥗',start:'20:30',end:'21:00',color:'#a8f76a',notes:'🎯 ~550 kcal · 40g proteína\n\nPrioridad hoy (día de entreno):\n• Proteína: pechuga de pollo, pavo, merluza, huevos\n• Verduras: brócoli, espinacas, tomate, pepino\n• Carbos moderados: boniato pequeño, arroz, pan integral\n\nNo fritos. No procesados. Agua siempre.'},
+  {id:'l14',name:'Tiempo libre',emoji:'🎮',start:'21:00',end:'22:00',color:'#5e577a',notes:'Esto es 100% tuyo. Sin culpa.\nJuegos, redes, amigos, series, lo que quieras.\nTe lo has ganado con creces.'},
+  {id:'l15',name:'Rutina de noche',emoji:'🌙',start:'22:00',end:'22:30',color:'#3a3550',notes:'1. Cepillarse los dientes 2 minutos\n2. Hilo dental entre TODOS los dientes\n3. Lavarse la cara\n4. Crema hidratante si usas\n5. Preparar ropa del martes\n6. Dejar el móvil a cargar FUERA de la cama\n7. Leer 10 min en papel\n8. Apagar todo y dormir — objetivo: 7-8h'},
+],
+1:[ // MARTES — Inglés
+  {id:'m0',name:'Despertarse',emoji:'⏰',start:'07:00',end:'07:05',color:'#f7a26a',notes:'Alarma. Sin snooze. Tres respiraciones. A levantarse.'},
+  {id:'m1',name:'Higiene de mañana',emoji:'🪥',start:'07:05',end:'07:30',color:'#5edbc0',notes:'Baño.\nAgua fría en la cara.\nDientes 2 minutos.\nLengua con cepillo.\nDesodorante.\nPeinarse.\nVestirse.'},
+  {id:'m2',name:'Desayuno',emoji:'🥣',start:'07:30',end:'07:50',color:'#a8f76a',notes:'🎯 ~580 kcal · 28g proteína\n\nOpción A: Tostadas integrales con pavo y tomate + café con leche\nOpción B: Yogur griego 200g + granola 40g + fresas + café\n\nSentado. Sin pantallas. Mastica bien.'},
+  {id:'m3',name:'Preparar y salir',emoji:'🎒',start:'07:50',end:'08:00',color:'#f7a26a',notes:'Mochila, agua, auriculares. Salir con margen.'},
+  {id:'m4',name:'🏫 Clase',emoji:'🏫',start:'08:00',end:'14:00',color:'#f7a26a',notes:'Apunta, participa, pregunta dudas.\nEn los descansos: levántate y muévete.\nBebe agua durante la clase.\nMarca lo que no entiendas para repasarlo.',clase:true},
+  {id:'m5',name:'Comida fuera',emoji:'🍽️',start:'14:00',end:'15:00',color:'#a8f76a',notes:'🎯 ~650 kcal · 40g proteína\nMenú completo con proteína + verdura + carbos.\nAgua. Sin fritos.'},
+  {id:'m6',name:'Descanso — llegada a casa',emoji:'🏠',start:'15:00',end:'15:30',color:'#5e577a',notes:'Llega. Deja la mochila. Ropa cómoda.\n10-15 min tumbado SIN pantallas.\nBebe 1 vaso de agua grande.\nMóvil máx 10 min después.\n⚠️ No te quedes dormido más de 20 min.'},
+  {id:'m7',name:'Ciberseguridad — Concepto nuevo',emoji:'💻',start:'15:30',end:'16:30',color:'#7c6af7',notes:'1. Tema de hoy: OSINT / análisis de malware / pentesting web\n2. Busca vídeo corto (15-20 min) + artículo o documentación\n3. Toma apuntes mientras consumes el contenido\n4. Al terminar: prueba algo práctico aunque sea mínimo\n5. Escribe 3 cosas aprendidas y 1 duda concreta\n\n📚 Recursos OSINT: Shodan, theHarvester, Maltego\n📚 Pentesting: OWASP, PortSwigger Academy, DVWA'},
+  {id:'m8',name:'Estiramientos y movilidad',emoji:'🧘',start:'16:30',end:'17:00',color:'#5edbc0',notes:'Rutina completa (sin entreno hoy — más tiempo para movilidad):\n\n1. Cuello: rotaciones lentas 1 min, luego lado-lado 1 min\n2. Hombros: círculos adelante y atrás, 30 seg cada\n3. Espalda alta: gato-vaca en el suelo, 2 min\n4. Espalda baja: rodillas al pecho tumbado, 1 min\n5. Cadera: mariposa sentado, empuja suavemente rodillas, 2 min\n6. Isquiotibiales: de pie, intenta tocarte los pies, 1 min c/lado\n7. Gemelos: talón en el suelo apoyado en pared, 45 seg c/lado\n8. Respiración final: 2 min de respiración abdominal\n\n🎵 Pon música tranquila. No hay prisa.'},
+  {id:'m9',name:'🇬🇧 Inglés — Gramática y Escritura',emoji:'🇬🇧',start:'17:00',end:'18:30',color:'#5edbc0',notes:'━━ BLOQUE 1 — Gramática (30 min) ━━\n• Duolingo 15 min\n• Estudia 1 regla gramatical (tiempos verbales, condicionales, pasiva)\n• Haz 10 ejercicios escritos de esa regla\n• Corrígelos al final\n\n━━ BLOQUE 2 — Vocabulario (30 min) ━━\n• Anki o flashcards: 20 palabras nuevas\n• Escribe 5 frases usando las palabras nuevas\n• Lee en voz alta las frases — pronunciación importa\n\n━━ BLOQUE 3 — Producción escrita (30 min) ━━\n• Escribe 1 párrafo de 6-8 frases en inglés sobre tu día\n• Usa Google Docs + LanguageTool para corregir\n• Guárdalo — verás tu progreso con el tiempo\n\n📱 App recomendada: Duolingo + Anki + LanguageTool'},
+  {id:'m10',name:'Repaso inglés',emoji:'📝',start:'18:30',end:'19:00',color:'#5edbc0',notes:'• Escucha 1 episodio de podcast en inglés:\n  → BBC 6 Minute English (perfecto para tu nivel)\n  → All Ears English\n  → Business English Pod\n• Anota 5 expresiones o phrasal verbs nuevos\n• Repítelos en voz alta'},
+  {id:'m11',name:'Proyecto ciberseguridad',emoji:'🛡️',start:'19:00',end:'20:00',color:'#7c6af7',notes:'• Documenta en GitHub lo de hoy\n• Avanza en write-up o reto activo en TryHackMe\n• Si hay algo incompleto de ayer: ciérralo\n• Revisa que el README de tu proyecto esté actualizado'},
+  {id:'m12',name:'Curiosidades y ocio educativo',emoji:'🎬',start:'20:00',end:'20:30',color:'#f76a8a',notes:'Serie, documental, vídeo. En inglés si puedes — doble beneficio.'},
+  {id:'m13',name:'Cena',emoji:'🥗',start:'20:30',end:'21:00',color:'#a8f76a',notes:'🎯 ~550 kcal · 38g proteína\n• Salmón o merluza + arroz + verduras, o\n• Tortilla de 3 huevos + ensalada + pan integral'},
+  {id:'m14',name:'Tiempo libre',emoji:'🎮',start:'21:00',end:'22:00',color:'#5e577a',notes:'Tuyo. Sin culpa.'},
+  {id:'m15',name:'Rutina de noche',emoji:'🌙',start:'22:00',end:'22:30',color:'#3a3550',notes:'Dientes + hilo dental + cara + crema si usas + ropa de mañana + leer 10 min + apagar y dormir.'},
+],
+2:[ // MIÉRCOLES — Entreno tren inferior
+  {id:'x0',name:'Despertarse',emoji:'⏰',start:'07:00',end:'07:05',color:'#f7a26a',notes:'Sin snooze. Levántate. Hoy toca piernas.'},
+  {id:'x1',name:'Higiene de mañana',emoji:'🪥',start:'07:05',end:'07:30',color:'#5edbc0',notes:'Baño. Agua fría en cara. Dientes 2 min. Lengua. Desodorante. Vestirse.'},
+  {id:'x2',name:'Desayuno',emoji:'🥣',start:'07:30',end:'07:50',color:'#a8f76a',notes:'🎯 ~620 kcal · 30g proteína\nDía de piernas = carga bien de carbos.\n• Avena 60g + leche + 2 huevos + plátano + café\nO avena con proteína en polvo si tienes.'},
+  {id:'x3',name:'Preparar y salir',emoji:'🎒',start:'07:50',end:'08:00',color:'#f7a26a',notes:'Mochila, agua, puntual.'},
+  {id:'x4',name:'🏫 Clase',emoji:'🏫',start:'08:00',end:'14:00',color:'#f7a26a',notes:'Concéntrate. Apunta. Bebe agua.',clase:true},
+  {id:'x5',name:'Comida fuera',emoji:'🍽️',start:'14:00',end:'15:00',color:'#a8f76a',notes:'🎯 ~700 kcal (día de piernas = más carbos)\nPasta o arroz + pollo + ensalada. Agua siempre.'},
+  {id:'x6',name:'Ciberseguridad — Concepto nuevo',emoji:'💻',start:'15:00',end:'16:00',color:'#7c6af7',notes:'1. Tema de hoy: Burp Suite / Wireshark / análisis forense / vulnerabilidades web (XSS, SQLi)\n2. Práctica real con herramienta — no solo vídeos\n3. Apuntes + documenta en GitHub\n4. Objetivo: que alguien pudiera leer tus notas y entender el tema'},
+  {id:'x7',name:'Cambio ropa + hidratación',emoji:'👟',start:'16:00',end:'16:10',color:'#f76a8a',notes:'Ropa de entreno. 500ml agua ahora. Plátano o dátiles si tienes hambre.'},
+  {id:'x8',name:'🏋️ Entreno — Tren Inferior',emoji:'🏋️',start:'16:10',end:'18:00',color:'#f76a8a',notes:'━━ CALENTAMIENTO 10 min ━━\n• 5 min bicicleta estática o caminar rápido\n• Rotaciones de cadera: 10 c/dirección\n• Rotaciones de rodillas: 10 círculos\n• 10 sentadillas lentas sin peso\n\n━━ EJERCICIOS ━━\n• Sentadilla con barra o mancuernas: 4 × 10\n• Peso muerto rumano: 4 × 10 (espalda recta siempre)\n• Prensa de piernas: 3 × 12\n• Zancadas caminando: 3 × 10 c/pierna\n• Curl de isquiotibiales en máquina: 3 × 12\n• Extensión de cuádriceps: 3 × 12\n• Elevaciones de gemelo de pie: 4 × 15\n• Plancha abdominal: 3 × 45 seg\n\n⏱ Descanso 90 seg (piernas necesitan más)\n💧 Agua entre series'},
+  {id:'x9',name:'Estiramientos post-entreno',emoji:'🧘',start:'18:00',end:'18:20',color:'#5edbc0',notes:'1. Cuádriceps: de pie, talón al glúteo → 45 seg c/lado\n2. Isquiotibiales: sentado en el suelo, alcanza la punta del pie → 45 seg c/lado\n3. Glúteo: tumbado, rodilla cruzada al pecho → 45 seg c/lado\n4. Aductores: mariposa sentado, empuja suavemente → 1 min\n5. Gemelos: talón en suelo, punta arriba apoyado en pared → 40 seg c/lado\n6. Espalda baja: postura del niño → 1 min\n7. Cadera flexora: zancada baja en el suelo → 45 seg c/lado\n\n⚠️ Muy importante después de piernas. Tómate el tiempo.'},
+  {id:'x10',name:'Ducha y merienda',emoji:'🚿',start:'18:20',end:'18:50',color:'#5edbc0',notes:'DUCHA: Caliente + fría final (enfoca el agua fría en las piernas).\n\nMERIENDA:\n🎯 ~380 kcal · 35g proteína\n• Batido proteína + leche, o\n• Yogur griego + granola + miel'},
+  {id:'x11',name:'Proyecto ciberseguridad',emoji:'🛡️',start:'18:50',end:'20:00',color:'#7c6af7',notes:'• Avanza en tu portfolio o reto de la semana\n• Documenta, sube a GitHub\n• Si tienes TryHackMe: completa al menos 1 room o avanza significativamente'},
+  {id:'x12',name:'Curiosidades y ocio educativo',emoji:'🎬',start:'20:00',end:'20:30',color:'#f76a8a',notes:'Algo que te inspire. Tech, ciencia, historia. Disfruta.'},
+  {id:'x13',name:'Cena',emoji:'🥗',start:'20:30',end:'21:00',color:'#a8f76a',notes:'🎯 ~550 kcal · 40g proteína\n• Proteína magra + verduras + carbos moderados\n• Merluza/pechuga + brócoli + boniato o arroz'},
+  {id:'x14',name:'Tiempo libre',emoji:'🎮',start:'21:00',end:'22:00',color:'#5e577a',notes:'Descansa. Piernas agradecidas.'},
+  {id:'x15',name:'Rutina de noche',emoji:'🌙',start:'22:00',end:'22:30',color:'#3a3550',notes:'Dientes + hilo dental + cara + ropa de mañana + leer + dormir.'},
+],
+3:[ // JUEVES — Inglés
+  {id:'j0',name:'Despertarse',emoji:'⏰',start:'07:00',end:'07:05',color:'#f7a26a',notes:'Sin snooze. Levántate.'},
+  {id:'j1',name:'Higiene de mañana',emoji:'🪥',start:'07:05',end:'07:30',color:'#5edbc0',notes:'Baño. Agua fría cara. Dientes 2 min. Lengua. Desodorante. Vestirse.'},
+  {id:'j2',name:'Desayuno',emoji:'🥣',start:'07:30',end:'07:50',color:'#a8f76a',notes:'🎯 ~560 kcal · 26g proteína\n• Tostadas integrales + aguacate + huevo pochado + café\n• O: tortitas de avena + plátano + miel'},
+  {id:'j3',name:'Preparar y salir',emoji:'🎒',start:'07:50',end:'08:00',color:'#f7a26a',notes:'Puntual. Con margen.'},
+  {id:'j4',name:'🏫 Clase',emoji:'🏫',start:'08:00',end:'14:00',color:'#f7a26a',notes:'Último esfuerzo serio de la semana. Apunta todo.\nPregunta las dudas que llevas acumulando.',clase:true},
+  {id:'j5',name:'Comida fuera',emoji:'🍽️',start:'14:00',end:'15:00',color:'#a8f76a',notes:'🎯 ~650 kcal · 42g proteína\nMenú completo. Agua. Sin fritos.'},
+  {id:'j6',name:'Descanso — llegada a casa',emoji:'🏠',start:'15:00',end:'15:30',color:'#5e577a',notes:'Descansa 30 min real.\nTumbado sin pantallas.\nMúsica suave o silencio.\nBebe agua.'},
+  {id:'j7',name:'Ciberseguridad — Concepto nuevo',emoji:'💻',start:'15:30',end:'16:30',color:'#7c6af7',notes:'1. Tema: vulnerabilidades web (XSS, SQL Injection, CSRF, Path Traversal)\n2. Practica en DVWA, PortSwigger Academy, o OWASP WebGoat\n3. Apunta cada vulnerabilidad: qué es, cómo se explota, cómo se previene\n4. Documenta en GitHub\n5. Revisa las dudas de la semana que apuntaste'},
+  {id:'j8',name:'Estiramientos y movilidad',emoji:'🧘',start:'16:30',end:'17:00',color:'#5edbc0',notes:'Rutina completa (sin entreno hoy):\nCuello → Hombros → Espalda alta y baja → Cadera → Piernas\n\nBonus: busca en YouTube "yoga 20 min principiantes" y síguelo.\nFoam roller en piernas si tienes resaca muscular de ayer.'},
+  {id:'j9',name:'🇬🇧 Inglés — Listening y Speaking',emoji:'🇬🇧',start:'17:00',end:'18:30',color:'#5edbc0',notes:'━━ BLOQUE 1 — Listening (45 min) ━━\n• Capítulo de serie en inglés (subtítulos EN, no ES)\n• Anota 10 expresiones o palabras nuevas\n• Pausa y repite en voz alta las frases difíciles\n• Recomiendado: Friends, The Office, Suits (inglés accesible)\n\n━━ BLOQUE 2 — Speaking (30 min) ━━\n• Grábate 2 min hablando en inglés de tu día (no te escuches después si te da vergüenza, el ejercicio importa)\n• O: shadowing → repite exactamente lo que escuchas en la serie\n• O: conversa con ChatGPT en inglés\n\n━━ BLOQUE 3 — Repaso (15 min) ━━\n• Repasa las flashcards de Anki de la semana'},
+  {id:'j10',name:'Repaso inglés',emoji:'📝',start:'18:30',end:'19:00',color:'#5edbc0',notes:'Escribe en inglés un resumen de esta semana en 8-10 frases.\nNo uses Google Translate — esfuérzate.\nDespués corrígelo con LanguageTool o DeepL.'},
+  {id:'j11',name:'Proyecto ciberseguridad',emoji:'🛡️',start:'19:00',end:'20:00',color:'#7c6af7',notes:'Cierra los avances de la semana.\n• Todo en GitHub con commits descriptivos\n• README actualizado\n• Planifica qué aprenderás la próxima semana'},
+  {id:'j12',name:'Curiosidades y ocio educativo',emoji:'🎬',start:'20:00',end:'20:30',color:'#f76a8a',notes:'Video, documental, serie. Disfruta el jueves por la noche.'},
+  {id:'j13',name:'Cena',emoji:'🥗',start:'20:30',end:'21:00',color:'#a8f76a',notes:'🎯 ~540 kcal · 38g proteína\n• Algo rico: arroz con verduras y pollo, salmón al horno...'},
+  {id:'j14',name:'Tiempo libre',emoji:'🎮',start:'21:00',end:'22:00',color:'#5e577a',notes:'Mañana es viernes. Disfruta la noche del jueves.'},
+  {id:'j15',name:'Rutina de noche',emoji:'🌙',start:'22:00',end:'22:30',color:'#3a3550',notes:'Dientes + hilo + cara + ropa de mañana + leer + dormir.'},
+],
+4:[ // VIERNES — Entreno full body
+  {id:'v0',name:'Despertarse',emoji:'⏰',start:'07:00',end:'07:05',color:'#f7a26a',notes:'¡Último día de clase! Sin snooze. Con energía.'},
+  {id:'v1',name:'Higiene de mañana',emoji:'🪥',start:'07:05',end:'07:30',color:'#5edbc0',notes:'Baño. Cara agua fría. Dientes 2 min. Lengua. Desodorante. Arréglate bien — es viernes.'},
+  {id:'v2',name:'Desayuno',emoji:'🥣',start:'07:30',end:'07:50',color:'#a8f76a',notes:'🎯 ~640 kcal · 30g proteína\n• Tostadas + mantequilla de cacahuete + plátano + café, o\n• Avena + proteína en polvo + leche + frutos rojos'},
+  {id:'v3',name:'Preparar y salir',emoji:'🎒',start:'07:50',end:'08:00',color:'#f7a26a',notes:'Mochila, agua. Último empujón.'},
+  {id:'v4',name:'🏫 Clase',emoji:'🏫',start:'08:00',end:'14:00',color:'#f7a26a',notes:'Aprovecha al máximo. Es el último día.\nPregunta todas las dudas pendientes de la semana.',clase:true},
+  {id:'v5',name:'Comida fuera',emoji:'🍽️',start:'14:00',end:'15:00',color:'#a8f76a',notes:'Hoy puedes permitirte algo un poco más libre. Igual intenta que tenga proteína.'},
+  {id:'v6',name:'Repaso ciberseguridad semanal',emoji:'💻',start:'15:00',end:'16:00',color:'#7c6af7',notes:'1. Abre tus apuntes de L, M, X, J\n2. Escribe: "Esta semana aprendí..." (mínimo 5 puntos concretos)\n3. ¿Qué quedó sin terminar? Apúntalo para la próxima semana\n4. Actualiza tu Notion o cuaderno con los temas estudiados\n5. Elige 3 temas para la próxima semana'},
+  {id:'v7',name:'Cambio ropa + hidratación',emoji:'👟',start:'16:00',end:'16:10',color:'#f76a8a',notes:'Ropa de entreno. Agua. ¡Último entreno de la semana!'},
+  {id:'v8',name:'🏋️ Entreno — Full Body',emoji:'🏋️',start:'16:10',end:'18:00',color:'#f76a8a',notes:'━━ CALENTAMIENTO 10 min ━━\n• Cardio ligero 5 min\n• Movilidad articular general\n\n━━ FULL BODY ━━\n• Sentadilla: 3 × 10\n• Press banca: 3 × 10\n• Peso muerto: 3 × 8 (técnica perfecta, no peso)\n• Remo con barra o mancuernas: 3 × 10\n• Press de hombro: 3 × 10\n• Dominadas o jalón: 3 × fallo\n• Plancha: 3 × 45 seg\n• Curl bíceps: 2 × 12\n• Tríceps: 2 × 12\n\nUltimo entreno de la semana. Dalo todo.'},
+  {id:'v9',name:'Estiramientos post-entreno',emoji:'🧘',start:'18:00',end:'18:20',color:'#5edbc0',notes:'Cuerpo entero:\nPecho + hombros + tríceps\nEspalda + bíceps\nPiernas + glúteos\nCadera + espalda baja\n\n15 min mínimo. Te lo has ganado.'},
+  {id:'v10',name:'Ducha y merienda',emoji:'🚿',start:'18:20',end:'18:50',color:'#5edbc0',notes:'Ducha buena. Caliente + fría al final.\nMerienda: ~380 kcal · 35g proteína.'},
+  {id:'v11',name:'Curiosidades y relax',emoji:'🎬',start:'18:50',end:'20:00',color:'#f76a8a',notes:'Película, serie, lo que quieras. Es viernes.'},
+  {id:'v12',name:'Cena y noche libre',emoji:'🎉',start:'20:00',end:'23:59',color:'#f76a8a',notes:'¡Viernes noche es TUYA!\nSale con amigos, queda, disfruta.\nSemana completada — te lo mereces.'},
+],
+5:[ // SÁBADO
+  {id:'s0',name:'Levantarse sin alarma',emoji:'😴',start:'09:00',end:'09:30',color:'#f7a26a',notes:'Sin alarma. El cuerpo descansa lo que necesita.\nCuando abras los ojos: no cojas el móvil 10 min.\nEstira en la cama, respira, despiértate despacio.'},
+  {id:'s1',name:'Higiene de mañana',emoji:'🪥',start:'09:30',end:'09:55',color:'#5edbc0',notes:'Ducha completa (lavar pelo si toca).\nDientes + hilo dental (sábado: sin prisa = más cuidado).\nCrema hidratante si usas.\nRopa cómoda limpia.'},
+  {id:'s2',name:'Desayuno especial',emoji:'🥞',start:'09:55',end:'10:45',color:'#a8f76a',notes:'¡Sábado! Algo más elaborado:\n• Tortitas de avena con plátano y miel + zumo natural\n• O: tostadas con aguacate + huevo pochado + café especial\n• O: desayuno completo como los de toda la vida\n\nSin prisa. Disfruta la mañana.'},
+  {id:'s3',name:'Paseo o actividad suave',emoji:'🚶',start:'11:00',end:'12:00',color:'#5edbc0',notes:'Sal a caminar 30-45 min por donde más te guste.\nBicicleta, skate, lo que te apetezca.\nSin auriculares a veces — observa el entorno.\nLuz natural = mejor estado de ánimo y vitamina D.'},
+  {id:'s4',name:'Ciberseguridad (opcional)',emoji:'💡',start:'12:30',end:'13:30',color:'#7c6af7',notes:'Solo si te apetece. Sin presión.\nSi abres algo, que sea algo que disfrutes:\n• CTF por diversión\n• Video pendiente que tenías ganas de ver\n• Leer un artículo que te llame la atención'},
+  {id:'s5',name:'Almuerzo',emoji:'🍽️',start:'14:00',end:'15:00',color:'#a8f76a',notes:'Sábado = come lo que te apetezca.\nDisfrutar de la comida también es parte de la vida.'},
+  {id:'s6',name:'Siesta o descanso real',emoji:'🛌',start:'15:00',end:'16:30',color:'#5e577a',notes:'Siesta máx 20-30 min si tienes sueño.\nO descansa sin pantallas: música, silencio, podcast.\nEl descanso completo también forma parte del progreso.'},
+  {id:'s7',name:'Tiempo libre total',emoji:'🎮',start:'16:30',end:'20:30',color:'#5e577a',notes:'100% tuyo.\nAmigos, hobbies, videojuegos, salir, lo que sea.\nNo pienses en el lunes todavía.'},
+  {id:'s8',name:'Cena especial',emoji:'🍕',start:'20:30',end:'21:30',color:'#a8f76a',notes:'Pizza, sushi, hamburguesa — lo que quieras.\nSábado es el día cheat meal si haces.\nDisfrútalo sin culpa.'},
+  {id:'s9',name:'Rutina de noche',emoji:'🌙',start:'23:00',end:'23:30',color:'#3a3550',notes:'Aunque llegues tarde:\n1. Dientes + hilo dental (siempre, sin excepciones)\n2. Lavarse la cara\n3. Dormir'},
+],
+6:[ // DOMINGO
+  {id:'d0',name:'Levantarse tranquilo',emoji:'☀️',start:'09:00',end:'09:30',color:'#f7a26a',notes:'Sin alarma si puedes.\nEstira en la cama antes de levantarte.\nMira por la ventana un momento antes del móvil.'},
+  {id:'d1',name:'Higiene de mañana completa',emoji:'🪥',start:'09:30',end:'10:05',color:'#5edbc0',notes:'Ducha completa (lavar pelo si no fue el sábado).\nDientes 2 min + hilo dental.\nCrema hidratante facial.\nRopa cómoda limpia de la semana nueva.'},
+  {id:'d2',name:'Desayuno y café',emoji:'☕',start:'10:05',end:'10:50',color:'#a8f76a',notes:'Sin prisa. Café bueno, tostadas o lo que tengas.\nLee algo ligero o mira por la ventana.\nNi estudio ni pantallas obligatorias.'},
+  {id:'d3',name:'Yoga y movilidad completa',emoji:'🧘',start:'11:00',end:'11:50',color:'#5edbc0',notes:'Rutina completa de domingo:\n\n1. Respiración consciente: 2 min\n2. Cuello suave: rotaciones lentas, 2 min\n3. Hombros y espalda alta: 3 min\n4. Gato-vaca lento: 2 min\n5. Torsiones espinales tumbado: 3 min\n6. Mariposa o paloma: 3 min c/lado\n7. Isquiotibiales sentado: 2 min c/lado\n8. Postura del niño: 3 min\n9. Savasana — tumbado sin hacer nada: 5 min\n\n🎵 Música tranquila o silencio absoluto.'},
+  {id:'d4',name:'Revisión semanal',emoji:'📊',start:'12:00',end:'12:45',color:'#7c6af7',notes:'Coge papel o abre Notion:\n\n1. ¿Qué 5 cosas concretas de ciberseguridad aprendí?\n2. ¿Cuántos entrenamientos completé? (objetivo: 3)\n3. ¿Cómo fue el inglés? ¿Cuánto practiqué?\n4. ¿Qué falló esta semana? ¿Por qué?\n5. ¿De qué estoy orgulloso?\n6. ¿Dormí bien? ¿Comí bien?\n\nSé honesto contigo mismo. Sin juicio.'},
+  {id:'d5',name:'Planificación próxima semana',emoji:'📅',start:'12:45',end:'13:15',color:'#7c6af7',notes:'1. 5 temas concretos de ciberseguridad (uno por día L-V)\n2. Objetivo inglés de la semana: ¿qué quiero mejorar?\n3. Algo concreto a mejorar en el entreno\n4. ¿Hay exámenes, entregas o cosas importantes en clase?\n5. Anótalo aquí en la app o en papel'},
+  {id:'d6',name:'Almuerzo',emoji:'🍽️',start:'14:00',end:'15:00',color:'#a8f76a',notes:'Comer en casa si puedes. Algo saludable y rico.\nÚltimo almuerzo libre antes de la semana.'},
+  {id:'d7',name:'Tiempo libre y descanso',emoji:'🎬',start:'15:00',end:'20:00',color:'#5e577a',notes:'Recarga pilas al máximo.\nEl objetivo es llegar al lunes con energía.'},
+  {id:'d8',name:'Preparar semana',emoji:'🎒',start:'20:00',end:'20:30',color:'#f7a26a',notes:'1. Mochila lista con todo\n2. Ropa del lunes preparada y a la vista\n3. Cargadores y auriculares listos\n4. Revisar horario de clase del lunes\n5. Dormir a buena hora — el lunes empieza la noche del domingo'},
+  {id:'d9',name:'Cena ligera',emoji:'🥗',start:'20:30',end:'21:00',color:'#a8f76a',notes:'🎯 ~480 kcal — ligero para dormir bien\n• Sopa, ensalada, tortilla ligera, pechuga\n• Nada pesado el domingo — mejora el sueño'},
+  {id:'d10',name:'Rutina de noche y dormir temprano',emoji:'🌙',start:'21:30',end:'22:00',color:'#3a3550',notes:'1. Dientes 2 min + hilo dental\n2. Lavarse la cara\n3. Crema hidratante\n4. Preparar alarma para las 7:00\n5. Leer 10 min en papel\n6. Apagar TODO a las 22:00\n\nDormir bien el domingo = semana ganada desde el inicio.'},
+]};
+
+// ═══════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════
+function initData(){
+  if(Object.keys(S.tasks()).length) return;
+  const out={};
+  Object.entries(PLAN).forEach(([k,tasks])=>{out[k]=tasks.map(t=>({...t,done:false}));});
+  S.setTasks(out);
+}
+
+// ═══════════════════════════════════════
+// DAY TABS
+// ═══════════════════════════════════════
+function buildDayTabs(){
+  const el=document.getElementById('day-tabs');
+  const d=S.tasks();
+  const today=realDay();
+  const now=new Date();
+  const dow=now.getDay();
+  const sw=new Date(now);
+  sw.setDate(now.getDate()+(dow===0?-6:1-dow));
+  sw.setHours(0,0,0,0);
+  el.innerHTML=DS.map((n,i)=>{
+    const dt=new Date(sw);dt.setDate(sw.getDate()+i);
+    const has=(d[i]||[]).length>0;
+    return `<button class="dtab${i===curDay?' active':''}${has?' has':''}${i===today?' today':''}" onclick="goDay(${i})">
+      <span class="dn">${n}</span>
+      <span class="dd">${dt.getDate()}</span>
+      <div class="tdot"></div>
+    </button>`;
+  }).join('');
+}
+
+function goDay(i){
+  curDay=i;
+  document.getElementById('f-day').value=i;
+  buildDayTabs();
+  if(curMain==='agenda') renderAgenda();
+  else if(curMain==='food') renderFood();
+}
+
+// ═══════════════════════════════════════
+// MAIN NAV
+// ═══════════════════════════════════════
+function switchMain(tab,btn){
+  curMain=tab;
+  document.querySelectorAll('.mnav').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('show'));
+  document.getElementById('pg-'+tab).classList.add('show');
+  if(tab==='agenda') renderAgenda();
+  else if(tab==='food') renderFood();
+  else renderHigiene();
+}
+
+// ═══════════════════════════════════════
+// AGENDA
+// ═══════════════════════════════════════
+function chipData(i){
+  if(i===0||i===2||i===4) return ['Entreno','chip-ent'];
+  if(i===1||i===3) return ['Inglés','chip-ing'];
+  if(i===5) return ['Descanso','chip-lib'];
+  return ['Planificación','chip-pla'];
+}
+
+function renderAgenda(){
+  const d=S.tasks();
+  const tasks=(d[curDay]||[]).sort((a,b)=>t2m(a.start)-t2m(b.start));
+  const now=nowMin(), today=realDay(), isToday=curDay===today;
+  const done=tasks.filter(t=>t.done).length;
+  const pct=tasks.length?Math.round(done/tasks.length*100):0;
+  const [chipTxt,chipCls]=chipData(curDay);
+
+  let html='';
+  if(isToday) html+=`<div class="alert">⚡ Hoy es ${DN[curDay]} — pulsa cualquier bloque para ver los pasos detallados</div>`;
+
+  html+=`<div class="day-head-card">
+    <div class="dhc-left">
+      <h2>${DN[curDay]}</h2>
+      <p>${curDay<5?'Clase 08:00–14:00 · ':''} ${chipTxt}</p>
+    </div>
+    <div style="display:flex;gap:7px;align-items:center">
+      <span class="chip ${chipCls}">${chipTxt}</span>
+      <button class="add-btn" onclick="openTaskMod()">+ Añadir</button>
+    </div>
+  </div>`;
+
+  html+=`<div class="stats-row">
+    <div class="stat"><div class="stat-n">${tasks.length}</div><div class="stat-l">bloques</div></div>
+    <div class="stat"><div class="stat-n">${done}</div><div class="stat-l">completados</div></div>
+    <div class="stat"><div class="stat-n">${pct}%</div><div class="stat-l">progreso</div></div>
+  </div>
+  <div class="prog-box">
+    <div class="prog-row"><span>Progreso del día</span><span>${pct}%</span></div>
+    <div class="pbar"><div class="pfill" style="width:${pct}%"></div></div>
+  </div>`;
+
+  if(!tasks.length){
+    html+=`<div class="empty-state"><div class="emo">📭</div><p>Sin bloques para ${DN[curDay]}</p></div>`;
+  } else {
+    html+=tasks.map((t,idx)=>{
+      const s=t2m(t.start),e=t2m(t.end);
+      const isNow=isToday&&now>=s&&now<e;
+      const isDone=t.done;
+      const dur=e-s;
+      const isLast=idx===tasks.length-1;
+      const col=isDone?'#3a3550':t.color||'#7c6af7';
+      const steps=t.notes?t.notes.split('\n').filter(x=>x.trim()):[];
+      return `<div class="tl-row">
+        <div class="tl-time">${t.start}</div>
+        <div class="tl-mid">
+          <div class="tl-dot" style="background:${col}"></div>
+          ${!isLast?`<div class="tl-line" style="background:${col}"></div>`:''}
+        </div>
+        <div class="tl-right">
+          <div class="card${isNow?' now':''}${isDone?' done':''}${t.clase?' clase-card':''}">
+            <div class="accent-bar" style="background:${t.color||'#7c6af7'}"></div>
+            <div class="card-head" onclick="toggleCB('cb-${t.id}')">
+              <div class="cico" style="background:${t.color||'#7c6af7'}20">${t.emoji||'📌'}</div>
+              <div class="cinfo">
+                <div class="cname">${t.name}</div>
+                <div class="cmeta">${t.start}–${t.end} · ${durFmt(dur)}</div>
+              </div>
+              <div class="cright">
+                ${isNow?'<span class="pill pill-now">▶ AHORA</span>':''}
+                ${isDone?'<span class="pill pill-done">✓ hecho</span>':''}
+                ${!t.clase?'<span class="pill-notif">🔔</span>':''}
+              </div>
+            </div>
+            <div class="card-body hidden" id="cb-${t.id}">
+              ${steps.length?`<ul class="steps">${steps.map((s,i)=>`<li><span class="snum">${i+1}</span><span class="stxt">${s.replace(/\*\*(.*?)\*\*/g,'<b>$1</b>')}</span></li>`).join('')}</ul>`:''}
+              <div class="cacts">
+                <button class="ca" onclick="markDone('${t.id}')">${isDone?'↩️ Desmarcar':'✅ Hecho'}</button>
+                <button class="ca" onclick="editTask('${t.id}')">✏️ Editar</button>
+                <button class="ca red" onclick="delTask('${t.id}')">🗑️ Eliminar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  document.getElementById('pg-agenda').innerHTML=html;
+}
+
+function toggleCB(id){const el=document.getElementById(id);if(el)el.classList.toggle('hidden');}
+function markDone(id){const d=S.tasks();const t=(d[curDay]||[]).find(x=>x.id===id);if(t)t.done=!t.done;S.setTasks(d);renderAgenda();}
+function delTask(id){const d=S.tasks();d[curDay]=(d[curDay]||[]).filter(x=>x.id!==id);S.setTasks(d);buildDayTabs();renderAgenda();scheduleAll();}
+function editTask(id){
+  const d=S.tasks();const t=(d[curDay]||[]).find(x=>x.id===id);if(!t)return;
+  editId=id;
+  document.getElementById('f-name').value=t.name;
+  document.getElementById('f-start').value=t.start;
+  document.getElementById('f-end').value=t.end;
+  document.getElementById('f-notes').value=t.notes||'';
+  document.getElementById('f-emoji').value=t.emoji||'';
+  document.getElementById('f-day').value=curDay;
+  document.getElementById('mt-title').textContent='Editar bloque';
+  document.getElementById('m-task').classList.add('show');
+}
+function openTaskMod(){
+  editId=null;
+  ['f-name','f-notes','f-emoji'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f-start').value='15:00';
+  document.getElementById('f-end').value='16:00';
+  document.getElementById('f-day').value=curDay;
+  document.getElementById('mt-title').textContent='Nuevo bloque';
+  document.getElementById('m-task').classList.add('show');
+}
+function saveTask(){
+  const name=document.getElementById('f-name').value.trim();
+  const start=document.getElementById('f-start').value;
+  const end=document.getElementById('f-end').value;
+  const notes=document.getElementById('f-notes').value.trim();
+  const emoji=document.getElementById('f-emoji').value.trim();
+  const day=parseInt(document.getElementById('f-day').value);
+  if(!name||!start||!end){alert('Rellena nombre y horario');return;}
+  if(t2m(start)>=t2m(end)){alert('La hora fin debe ser después del inicio');return;}
+  const d=S.tasks();if(!d[day])d[day]=[];
+  const cols=['#7c6af7','#5edbc0','#f76a8a','#f7a26a','#a8f76a','#5e577a'];
+  const col=cols[Math.floor(Math.random()*cols.length)];
+  if(editId){
+    const idx=d[curDay].findIndex(x=>x.id===editId);
+    if(idx>-1)d[curDay][idx]={...d[curDay][idx],name,start,end,notes,emoji};
+  } else {
+    d[day].push({id:'u'+Date.now(),name,start,end,notes,emoji,color:col,done:false});
+  }
+  S.setTasks(d);
+  document.getElementById('m-task').classList.remove('show');
+  buildDayTabs();if(day===curDay)renderAgenda();scheduleAll();
+}
+
+// ═══════════════════════════════════════
+// FOOD
+// ═══════════════════════════════════════
+function foodKey(){return `food_${curDay}_${todayStr()}`;}
+
+function renderFood(){
+  const key=foodKey();
+  const foods=S.food()[key]||[];
+  const wKey=`w_${todayStr()}`;
+  const glasses=S.water()[wKey]||0;
+
+  const totK=foods.reduce((s,f)=>s+(f.kcal||0),0);
+  const totP=foods.reduce((s,f)=>s+(f.prot||0),0);
+  const totC=foods.reduce((s,f)=>s+(f.carb||0),0);
+  const totF=foods.reduce((s,f)=>s+(f.fat||0),0);
+  const rem=KCAL_GOAL-totK;
+  const pP=Math.min(100,Math.round(totP/PROT_GOAL*100));
+  const pC=Math.min(100,Math.round(totC/CARB_GOAL*100));
+  const pF2=Math.min(100,Math.round(totF/FAT_GOAL*100));
+
+  let html=`<div style="font-size:11px;color:var(--text3);margin-bottom:10px;font-family:var(--mono)">📅 ${DN[curDay]} · objetivo ganar músculo · 65kg activo</div>`;
+
+  html+=`<div class="kcal-hero">
+    <div class="kh-top">
+      <div>
+        <div class="kh-consumed">${totK}<span> kcal</span></div>
+        <div class="kh-label">consumidas hoy</div>
+      </div>
+      <div class="kh-remaining">
+        <div class="kh-rem-n">${rem>0?rem:0}</div>
+        <div class="kh-rem-l">${rem>0?'kcal restantes':'✓ objetivo!'}</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px">objetivo ${KCAL_GOAL} kcal</div>
+      </div>
+    </div>
+    <div class="macros">
+      <div class="macro">
+        <div class="macro-val" style="color:#4ade80">${totP}g</div>
+        <div class="macro-lbl">Proteína</div>
+        <div class="macro-goal" style="color:var(--text3)">/ ${PROT_GOAL}g</div>
+        <div class="mbar"><div class="mbar-fill" style="width:${pP}%;background:#4ade80"></div></div>
+      </div>
+      <div class="macro">
+        <div class="macro-val" style="color:#facc15">${totC}g</div>
+        <div class="macro-lbl">Carbos</div>
+        <div class="macro-goal" style="color:var(--text3)">/ ${CARB_GOAL}g</div>
+        <div class="mbar"><div class="mbar-fill" style="width:${pC}%;background:#facc15"></div></div>
+      </div>
+      <div class="macro">
+        <div class="macro-val" style="color:#fb923c">${totF}g</div>
+        <div class="macro-lbl">Grasa</div>
+        <div class="macro-goal" style="color:var(--text3)">/ ${FAT_GOAL}g</div>
+        <div class="mbar"><div class="mbar-fill" style="width:${pF2}%;background:#fb923c"></div></div>
+      </div>
+    </div>
+  </div>`;
+
+  html+=`<div class="water-box">
+    <div class="water-hd">
+      <span>💧 Agua</span>
+      <span>${glasses}/8 vasos</span>
+    </div>
+    <div class="wglasses">
+      ${[...Array(8)].map((_,i)=>`<span class="wg${i<glasses?' fill':''}" onclick="addWater(${i+1})">💧</span>`).join('')}
+    </div>
+  </div>`;
+
+  const meals={};
+  foods.forEach(f=>{if(!meals[f.meal])meals[f.meal]=[];meals[f.meal].push(f);});
+  const mOrder=['Desayuno','Media mañana','Comida','Post-entreno','Merienda','Cena'];
+
+  if(!foods.length){
+    html+=`<div class="empty-state"><div class="emo">🍽️</div><p>Aún no registraste nada hoy</p></div>`;
+  } else {
+    mOrder.forEach(m=>{
+      const items=meals[m];
+      if(!items||!items.length) return;
+      const mK=items.reduce((s,f)=>s+f.kcal,0);
+      html+=`<div class="meal-section-title">${m} · ${mK} kcal</div>`;
+      items.forEach(f=>{
+        html+=`<div class="food-item">
+          <div class="food-ico">${f.emoji||'🍽️'}</div>
+          <div class="food-info">
+            <div class="food-name">${f.name}</div>
+            <div class="food-macros">P:${f.prot}g · C:${f.carb}g · G:${f.fat}g</div>
+          </div>
+          <div class="food-kcal">${f.kcal}</div>
+          <button class="fdel" onclick="delFood('${f.id}')">✕</button>
+        </div>`;
+      });
+    });
+  }
+
+  html+=`<button class="add-food-btn" onclick="document.getElementById('m-food').classList.add('show')">+ Añadir alimento</button>`;
+  document.getElementById('pg-food').innerHTML=html;
+}
+
+function addWater(n){
+  const k=`w_${todayStr()}`;
+  const w=S.water();w[k]=n;S.setWater(w);renderFood();
+}
+function qf(name,emoji,kcal,prot,carb,fat){
+  document.getElementById('ff-name').value=name;
+  document.getElementById('ff-emoji').value=emoji;
+  document.getElementById('ff-kcal').value=kcal;
+  document.getElementById('ff-prot').value=prot;
+  document.getElementById('ff-carb').value=carb;
+  document.getElementById('ff-fat').value=fat;
+}
+function saveFood(){
+  const name=document.getElementById('ff-name').value.trim();
+  const emoji=document.getElementById('ff-emoji').value.trim();
+  const meal=document.getElementById('ff-meal').value;
+  const kcal=parseInt(document.getElementById('ff-kcal').value)||0;
+  const prot=parseInt(document.getElementById('ff-prot').value)||0;
+  const carb=parseInt(document.getElementById('ff-carb').value)||0;
+  const fat=parseInt(document.getElementById('ff-fat').value)||0;
+  if(!name){alert('Escribe el nombre del alimento');return;}
+  const key=foodKey();
+  const d=S.food();if(!d[key])d[key]=[];
+  d[key].push({id:'f'+Date.now(),name,emoji,meal,kcal,prot,carb,fat});
+  S.setFood(d);
+  document.getElementById('m-food').classList.remove('show');
+  renderFood();
+}
+function delFood(id){
+  const key=foodKey();const d=S.food();
+  if(d[key])d[key]=d[key].filter(f=>f.id!==id);
+  S.setFood(d);renderFood();
+}
+
+// ═══════════════════════════════════════
+// HIGIENE
+// ═══════════════════════════════════════
+function renderHigiene(){
+  const sections=[
+    {
+      title:'☀️ Rutina de mañana — 07:05 a 07:30',
+      color:'#5edbc0',
+      tips:[
+        {ico:'🚽',b:'Ir al baño',txt:'Hazlo antes del desayuno — el cuerpo lo agradece.'},
+        {ico:'💦',b:'Agua fría en la cara',txt:'Activa el sistema nervioso, te despierta de verdad. 30 segundos.'},
+        {ico:'🪥',b:'Cepillarse los dientes 2 minutos',txt:'Todas las superficies: externas, internas, masticación. Usa timer.'},
+        {ico:'👅',b:'Limpiar la lengua',txt:'Con el cepillo o un raspador. Reduce el mal aliento significativamente.'},
+        {ico:'🧴',b:'Desodorante',txt:'Siempre. Sin excepción. Antes de vestirse.'},
+        {ico:'💈',b:'Peinarse',txt:'2 minutos de arreglarse hacen diferencia en cómo te perciben y cómo te sientes.'},
+        {ico:'👕',b:'Ropa limpia',txt:'Ropa interior y calcetines nuevos cada día. Sin excepción.'},
+      ]
+    },
+    {
+      title:'🚿 Ducha post-entreno — 18:20 a 18:45',
+      color:'#7c6af7',
+      tips:[
+        {ico:'🌡️',b:'Agua caliente 3-4 min',txt:'Relaja los músculos post-entreno. Lava con gel todo el cuerpo.'},
+        {ico:'🧴',b:'Gel corporal completo',txt:'Axilas, pies, cuello, zonas de pliegues. No te saltes nada.'},
+        {ico:'🧖',b:'Champú (días L, X, V)',txt:'No laves el pelo cada día — daña. Con 3 veces a la semana es suficiente.'},
+        {ico:'❄️',b:'Agua fría final 30-60 seg',txt:'Reduce inflamación muscular, mejora la circulación y activa el sistema inmune.'},
+        {ico:'🧴',b:'Desodorante tras secar bien',txt:'Secar bien las axilas antes de aplicar.'},
+        {ico:'💧',b:'Hidratante corporal',txt:'Si tienes piel seca, aplicar después de ducha cuando la piel aún está húmeda.'},
+      ]
+    },
+    {
+      title:'🌙 Rutina de noche — 22:00 a 22:30',
+      color:'#f76a8a',
+      tips:[
+        {ico:'🪥',b:'Cepillarse los dientes 2 minutos',txt:'La más importante del día. Después de cenar, siempre. Nunca saltársela.'},
+        {ico:'🧵',b:'Hilo dental',txt:'Entre todos los dientes, cada noche. Previene caries, encías y mal aliento.'},
+        {ico:'💦',b:'Lavarse la cara',txt:'Quita la suciedad, grasa y bacterias acumuladas durante el día.'},
+        {ico:'🧴',b:'Crema hidratante facial',txt:'La noche es cuando más penetra. Si no tienes, es una buena inversión.'},
+        {ico:'👕',b:'Preparar ropa del día siguiente',txt:'30 segundos que te ahorran 10 minutos de estrés por la mañana.'},
+        {ico:'📱',b:'Móvil a cargar fuera de la cama',txt:'La luz azul arruina el sueño. En otro sitio de la habitación.'},
+        {ico:'📖',b:'Leer 10 min en papel',txt:'Sin pantalla. Cualquier libro. Prepara el cerebro para dormir.'},
+      ]
+    },
+    {
+      title:'📅 Higiene semanal',
+      color:'#f7a26a',
+      tips:[
+        {ico:'👕',b:'Lunes: lavar ropa de entreno',txt:'Del fin de semana y la acumulada.'},
+        {ico:'🧹',b:'Miércoles: limpiar escritorio',txt:'Zona de estudio limpia = mente más clara y concentración mejor.'},
+        {ico:'🛏️',b:'Sábado: habitación + sábanas',txt:'Cambiar sábanas cada 1-2 semanas. Reducen ácaros y mejoran el sueño.'},
+        {ico:'👚',b:'Domingo: lavar toda la ropa',txt:'Preparar ropa limpia para toda la semana el domingo noche.'},
+        {ico:'💅',b:'Uñas: cada 10-14 días',txt:'Manos y pies. Uñas largas acumulan bacterias.'},
+        {ico:'🦷',b:'Dentista: cada 6 meses',txt:'Revisión y limpieza profesional. Fundamental para la salud dental a largo plazo.'},
+      ]
+    },
+    {
+      title:'💡 Consejos clave para tu edad',
+      color:'#a8f76a',
+      tips:[
+        {ico:'💧',b:'2.5-3 litros de agua al día',txt:'Registra en la pestaña Comida. La mayoría no bebe suficiente.'},
+        {ico:'😴',b:'7-8 horas de sueño',txt:'El músculo crece mientras duermes. El cerebro consolida lo aprendido. No negociable.'},
+        {ico:'☀️',b:'Protector solar',txt:'Empieza a usarlo aunque no sea verano. El daño solar es acumulativo.'},
+        {ico:'🏃',b:'Ducharse el mismo día del entreno',txt:'El sudor seco genera bacterias y mal olor. No dejarlo para mañana.'},
+        {ico:'🧠',b:'Higiene mental',txt:'Descanso, desconexión digital, naturaleza. También es higiene.'},
+        {ico:'🪒',b:'Afeitado o cuidado facial',txt:'El cuidado de la piel desde joven previene problemas futuros.'},
+      ]
+    }
+  ];
+
+  const html=sections.map(s=>`
+    <div class="hyg-section">
+      <div class="hyg-title">${s.title}</div>
+      <div class="hyg-card">
+        <div class="hyg-accent" style="background:${s.color}"></div>
+        <div class="hyg-body">
+          ${s.tips.map(t=>`<div class="tip-row">
+            <div class="tip-ico" style="background:${s.color}18">${t.ico}</div>
+            <div>
+              <div class="tip-txt"><b>${t.b}</b> — ${t.txt}</div>
+            </div>
+          </div>`).join('')}
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  document.getElementById('pg-higiene').innerHTML=html;
+}
+
+// ═══════════════════════════════════════
+// NOTIFICATIONS
+// ═══════════════════════════════════════
+async function reqNotif(){
+  if(!('Notification' in window)){alert('Usa Chrome para notificaciones');return;}
+  const p=await Notification.requestPermission();
+  notifOn=p==='granted';
+  const btn=document.getElementById('notif-btn');
+  if(notifOn){btn.textContent='🔔 Activos';btn.classList.add('on');scheduleAll();new Notification('✅ Avisos activados',{body:'Te avisaré al inicio de cada bloque de la semana.'});}
+}
+function scheduleAll(){
+  if(!notifOn) return;
+  Object.values(timers).forEach(clearTimeout);timers={};
+  const d=S.tasks();const now=new Date();const nowMs=now.getTime();
+  const dow=now.getDay();const sw=new Date(now);
+  sw.setDate(now.getDate()+(dow===0?-6:1-dow));sw.setHours(0,0,0,0);
+  Object.entries(d).forEach(([di,tasks])=>{
+    tasks.forEach(t=>{
+      if(t.clase)return;
+      const[hh,mm]=t.start.split(':').map(Number);
+      const td=new Date(sw);td.setDate(sw.getDate()+parseInt(di));td.setHours(hh,mm,0,0);
+      const ms=td.getTime()-nowMs;
+      if(ms>0&&ms<7*24*60*60*1000){
+        timers[t.id]=setTimeout(()=>{
+          const steps=t.notes?t.notes.split('\n').filter(x=>x.trim()):[];
+          new Notification(`${t.emoji||'⏰'} ${t.name}`,{body:steps[0]||`${t.start}–${t.end}`});
+        },ms);
+      }
+    });
+  });
+}
+
+// ═══════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════
+function buildSelect(){
+  document.getElementById('f-day').innerHTML=DN.map((n,i)=>`<option value="${i}">${n}</option>`).join('');
+}
+function closeMov(id,e){if(e.target.id===id||e.target.classList.contains('mov'))document.getElementById(id).classList.remove('show');}
+function tick(){
+  const n=new Date();
+  const h=String(n.getHours()).padStart(2,'0');
+  const m=String(n.getMinutes()).padStart(2,'0');
+  const sub=document.getElementById('clock-sub');
+  if(sub)sub.textContent=`${DN[realDay()].toLowerCase()} · ${h}:${m}`;
+  if(curMain==='agenda'&&curDay===realDay())renderAgenda();
+}
+
+// ═══════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════
+initData();buildSelect();
+if(Notification.permission==='granted'){notifOn=true;document.getElementById('notif-btn').classList.add('on');document.getElementById('notif-btn').textContent='🔔 Activos';}
+curDay=realDay();
+buildDayTabs();renderAgenda();tick();
+setInterval(tick,60000);
+
+// ═══════════════════════════════════════
+// SERVICE WORKER INLINE (PWA instalable)
+// ═══════════════════════════════════════
+if('serviceWorker' in navigator){
+  const swCode = `
+    self.addEventListener('install', e => self.skipWaiting());
+    self.addEventListener('activate', e => clients.claim());
+    self.addEventListener('fetch', e => e.respondWith(fetch(e.request).catch(() => new Response(''))));
+  `;
+  const blob = new Blob([swCode], {type: 'application/javascript'});
+  const swUrl = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(swUrl, {scope: './'}).catch(()=>{});
+}
+</script>
+</body>
+</html>
